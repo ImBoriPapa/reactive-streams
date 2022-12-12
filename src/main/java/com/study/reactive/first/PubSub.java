@@ -6,6 +6,7 @@ import org.reactivestreams.Subscription;
 
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -16,14 +17,37 @@ public class PubSub {
         //Publisher  <- Observable
         //Subscriber <- Observer
 
-        Iterable iter = Arrays.asList(1, 2, 3, 4, 5);
-        ExecutorService es = Executors.newSingleThreadExecutor();
+        List<String> data1 = Arrays.asList("data1", "data2", "data3", "data4", "data5");
+        List errorData = Arrays.asList("data1", "data2", 1, "data4", "data5");
 
-        Publisher pub = new Publisher() {
+        MyPublisher myPublisher = new MyPublisher(data1);
+
+        MySubscriber mySubscriber = new MySubscriber();
+
+        myPublisher.publisher.subscribe(mySubscriber.sub);
+
+    }
+
+    public static class MyPublisher {
+
+        private List data;
+
+        public MyPublisher(List data) {
+            this.data = data;
+        }
+
+        /**
+         * Publisher 구현
+         * subscribe(Subscriber s)
+         * request(long n)
+         * cancel()
+         */
+        Publisher publisher = new Publisher() {
+
             @Override
             public void subscribe(Subscriber subscriber) {
-
-                Iterator<Integer> it = iter.iterator();
+                ExecutorService es = Executors.newSingleThreadExecutor();
+                Iterator<String> it = data.iterator();
 
                 subscriber.onSubscribe(new Subscription() {
                     @Override
@@ -51,10 +75,19 @@ public class PubSub {
 
                     }
                 });
+                try {
+                    es.awaitTermination(10, TimeUnit.HOURS);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                es.shutdown();
             }
-        };
 
-        Subscriber<Integer> sub = new Subscriber<Integer>() {
+        };
+    }
+
+    public static class MySubscriber {
+        private Subscriber<String> sub = new Subscriber<String>() {
             Subscription subscription;
 
             @Override
@@ -65,8 +98,8 @@ public class PubSub {
             }
 
             @Override
-            public void onNext(Integer item) {
-                System.out.println(Thread.currentThread().getName()+" onNext " + item);
+            public void onNext(String item) {
+                System.out.println(Thread.currentThread().getName() + " onNext " + item);
                 this.subscription.request(1);
 
             }
@@ -81,9 +114,5 @@ public class PubSub {
                 System.out.println("onComplete");
             }
         };
-
-        pub.subscribe(sub);
-        es.awaitTermination(10, TimeUnit.HOURS);
-        es.shutdown();
     }
 }
